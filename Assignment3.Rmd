@@ -37,14 +37,23 @@ V1_ASD <- visit1 %>% filter(ASD == 1)
 The questions you will have to answer are:
 
 1. Assess the relation between symptom severity and IQ (focus on visit 1 and children with ASD) and report the model, a plot of the model, a couple of lines describing the quality of the model and interpreting the results. 
+
 P.S. Should you scale? 
+
 P.P.S. Don't forget to motivate your priors. 
-P.P.P.S. At least one plot for results and a plot for quality of each model (here and in the next questions) would be appreciated.
+
+P.P.P.S. At least one plot for results and a plot for quality of each model (here and in the 
+next questions) would be appreciated.
 
 1.1. Verbal IQ and ADOS
 ```{r + VerbalIQ, Get prior}
 
 #Raw Plot
+V1_ASD %>% ggplot(aes(y = ADOS, x = VerbalIQ)) + 
+  geom_smooth(method = 'lm', color = 'black') +
+  geom_point(aes(color = ADOS))
+
+
 plot(V1_ASD$ADOS ~ V1_ASD$VerbalIQ)
 
 #Standardize predictors to a mean of 0 and sd of 1
@@ -70,7 +79,8 @@ curve( dnorm( x , 0 , 0.5 ) , from=-3 , to=3 )
 
 
 #Set prior (using normal not student_t)
-prior = c(prior(normal(0, 0.5), class = 'Intercept'),  prior(normal(0, 0.5), class = 'b'), prior(normal(0,0.8), class = 'sigma'))
+
+prior = c(prior(normal(0, 0.5), class = 'Intercept'),  prior(normal(0, 0.5), class = 'b'), prior(normal(0,1), class = 'sigma'))
 
 m1_prior <- brm(m1_f, family = gaussian, V1_ASD, prior = prior, sample_prior = 'only', chain =1 )
 
@@ -85,9 +95,9 @@ pp_check(m1_prior, nsamples = 100)
 flist <-  alist(
     ADOS.s ~ dnorm(mu , sigma),
     mu <- a + b*VerbalIQ.s ,
-        a ~ dnorm( 0 , 0.5 ) ,
-        b ~ dnorm( 0 , 0.5 ) ,
-        sigma ~ dunif( 0 , 0.8 )
+        a ~ dnorm(0 , 0.5 ),
+        b ~ dnorm(0 , 0.5 ),
+        sigma ~ dunif(0,0.8)
   )
 
 m1.1 <- rethinking::map(flist, data = V1_ASD)
@@ -95,9 +105,6 @@ m1.1 <- rethinking::map(flist, data = V1_ASD)
 precis(m1.1)
 precis_plot(precis(m1.1))
 
-#Plot of raw data
-ggplot(V1_ASD, aes(VerbalIQ.s, ADOS.s)) +
-  geom_point()
 
 #Extract sample from the model
 post.samples=extract.samples(m1.1)
@@ -186,13 +193,15 @@ flist <-  alist(
     mu <- a + b*NonVerbalIQ.s ,
         a ~ dnorm( 0 , 0.5 ) ,
         b ~ dnorm( 0 , 0.5 ) ,
-        sigma ~ dunif( 0 , 0.8 )
+        sigma ~ dunif( 0 , 1 )
   )
 
 m1.2 <- rethinking::map(flist, data = V1_ASD)
 
 precis(m1.2)
 precis_plot(precis(m1.2))
+
+pp_check(m1.2, nsample = 1000)
 
 #Extract sample from the model
 post.samples=extract.samples(m1.2)
@@ -237,7 +246,6 @@ shade( mu.HPDI , NonVerbalIQ.s.seq )
 
 ```
 
-
 1.3. Social IQ and ADOS
 ```{r + MAP, social, plots}
 #Raw plot
@@ -252,14 +260,15 @@ flist <-  alist(
     ADOS.s ~ dnorm(mu , sigma),
     mu <- a + b*SocialIQ.s ,
         a ~ dnorm( 0 , 0.5 ) ,
-        b ~ dnorm( 0 , 1 ) ,
-        sigma ~ dunif( 0 , 3 )
+        b ~ dnorm( 0 , 0.5 ) ,
+        sigma ~ dunif( 0 , 1 )
   )
 
 m1.3 <- rethinking::map(flist, data = V1_ASD)
 
 precis(m1.3)
 precis_plot(precis(m1.3))
+
 
 #Extract sample from the model
 post.samples=extract.samples(m1.3)
@@ -416,9 +425,32 @@ col=rangi2 )
 ```
 
 
-###4. Let's discuss contents:
+```{r + Interaction?}
 
+#Is there an interaction 
+
+#checking with plots 
+ggplot(visit1, aes(NonVerbalIQ, ADOS, color = ASD)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "ADOS score by non-verbal IQ for ASD and TD") 
+
+
+ggplot(visit1, aes(VerbalIQ, ADOS, color = ASD)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "ADOS score by verbal IQ for ASD and TD") 
+
+ggplot(visit1, aes(SocialIQ, ADOS, color = ASD)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "ADOS score by social IQ for ASD and TD")
+
+```
+
+###4. Let's discuss contents:
 ##4.1. You have three scores for IQ, do they show shared variance? Is that the same in TD and ASD? What does that tell us about IQ?
+
 
 ```{r + Correlation + ASD only, TD only}
 
@@ -434,7 +466,7 @@ V1_TD$NonVerbalIQ.s = (V1_TD$NonVerbalIQ - mean(V1_TD$NonVerbalIQ, na.rm = T))/s
 V1_TD$SocialIQ.s = (V1_TD$SocialIQ-mean(V1_TD$SocialIQ, na.rm = T))/sd(V1_TD$SocialIQ)
 
 
-cor(select(V1_ASD, VerbalIQ.s, NonVerbalIQ.s, SocialIQ.s))
+cor(select(V1_ASD, VerbalIQ.s, NonVerbalIQ.s, SocialIQ.s, ADOS.s))
 cor(select(V1_TD, VerbalIQ, NonVerbalIQ, SocialIQ))
 
 ```
